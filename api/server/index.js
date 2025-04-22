@@ -9,7 +9,7 @@ const passport = require('passport');
 const mongoSanitize = require('express-mongo-sanitize');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
-const { jwtLogin, passportLogin } = require('~/strategies');
+const { jwtLogin, passportLogin, forwardedAuthLogin } = require('~/strategies');
 const { connectDb, indexSync } = require('~/lib/db');
 const { isEnabled } = require('~/server/utils');
 const { ldapLogin } = require('~/strategies');
@@ -72,6 +72,7 @@ const startServer = async () => {
   app.use(passport.initialize());
   passport.use(await jwtLogin());
   passport.use(passportLogin());
+  passport.use('forwardedAuth', forwardedAuthLogin());
 
   /* LDAP Auth */
   if (process.env.LDAP_URL && process.env.LDAP_USER_SEARCH_BASE) {
@@ -84,6 +85,11 @@ const startServer = async () => {
 
   app.use('/oauth', routes.oauth);
   /* API Endpoints */
+  // Apply forwarded auth middleware globally if enabled
+  if (process.env.FORWARD_AUTH_ENABLED === 'true') {
+    app.use(require('~/server/middleware/requireForwardedAuth'));
+  }
+
   app.use('/api/auth', routes.auth);
   app.use('/api/actions', routes.actions);
   app.use('/api/keys', routes.keys);
